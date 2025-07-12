@@ -1,5 +1,6 @@
 .DS_Store
 .gradle/
+.settings
 generated/
 bin/
 bin_test/
@@ -21,3 +22,7 @@ enroute.zip
 .idea
 *.iml
 languageServers-log/AlloyLanguageServer.log
+
+# Generated Protocol Buffer files
+org.alloytools.alloy.grpc/src/main/java/org/alloytools/alloy/grpc/proto/
+build
