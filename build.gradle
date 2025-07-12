@@ -1,0 +1,109 @@
+plugins {
+    id 'java'
+    id 'com.google.protobuf' version '0.9.4' apply false
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Configure the gRPC module to use standard Gradle instead of bnd
+project(':org.alloytools.alloy.grpc') {
+    apply plugin: 'java'
+    apply plugin: 'com.google.protobuf'
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation 'io.grpc:grpc-api:1.58.0'
+        implementation 'io.grpc:grpc-stub:1.58.0'
+        implementation 'io.grpc:grpc-protobuf:1.58.0'
+        implementation 'io.grpc:grpc-netty-shaded:1.58.0'
+        implementation 'io.grpc:grpc-services:1.58.0'
+        implementation 'com.google.protobuf:protobuf-java:3.24.4'
+        implementation 'javax.annotation:javax.annotation-api:1.3.2'
+
+        // bnd dependencies for CLI
+        implementation 'biz.aQute.bnd:aQute.libg:6.4.0'
+
+        // Alloy dependencies as JAR files
+        implementation files('lib/org.alloytools.alloy.core.jar')
+        implementation files('lib/org.alloytools.api.jar')
+        implementation files('lib/org.alloytools.pardinus.core.jar')
+
+        // SAT4J solver dependency (required by Alloy) - same version as in central.mvn
+        implementation 'org.sat4j:org.sat4j.core:2.3.1'
+        implementation 'org.sat4j:org.sat4j.maxsat:2.3.1'
+        implementation 'org.sat4j:org.sat4j.pb:2.3.1'
+
+        // Logging
+        implementation 'org.slf4j:slf4j-api:2.0.9'
+        runtimeOnly 'org.slf4j:slf4j-simple:2.0.9'
+
+        // JSON processing
+        implementation 'com.google.code.gson:gson:2.10.1'
+
+        // Test dependencies
+        testImplementation 'junit:junit:4.13.2'
+        testImplementation 'org.assertj:assertj-core:3.24.2'
+        testImplementation 'io.grpc:grpc-testing:1.58.0'
+        testImplementation 'org.mockito:mockito-core:5.5.0'
+        testImplementation 'org.slf4j:slf4j-simple:2.0.9'
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Configure source sets to include generated proto files
+    sourceSets {
+        main {
+            java {
+                srcDirs 'src/main/java'
+            }
+        }
+    }
+
+    // Configure Protocol Buffer generation
+    protobuf {
+        protoc {
+            artifact = 'com.google.protobuf:protoc:3.24.4'
+        }
+        plugins {
+            grpc {
+                artifact = 'io.grpc:protoc-gen-grpc-java:1.58.0'
+            }
+        }
+        generateProtoTasks {
+            all()*.plugins {
+                grpc {}
+            }
+        }
+    }
+
+    // Ensure proto files are generated before compilation
+    compileJava.dependsOn 'generateProto'
+
+    // Add application plugin for running the server
+    apply plugin: 'application'
+
+    // Configure the main class for running the server
+    application {
+        mainClass = 'org.alloytools.alloy.grpc.api.AlloyGrpcServer'
+    }
+}
+
+dependencies {
+    implementation 'io.grpc:grpc-api:1.58.0'
+    implementation 'io.grpc:grpc-stub:1.58.0'
+    implementation 'io.grpc:grpc-protobuf:1.58.0'
+    implementation 'io.grpc:grpc-netty-shaded:1.58.0'
+    implementation 'io.grpc:grpc-services:1.58.0'
+    implementation 'com.google.protobuf:protobuf-java:3.24.4'
+    implementation 'javax.annotation:javax.annotation-api:1.3.2'
+    testImplementation 'org.awaitility:awaitility:4.2.0'
+    testImplementation 'org.mockito:mockito-core:5.5.0'
+}

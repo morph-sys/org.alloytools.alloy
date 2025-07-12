@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package org.alloytools.alloy.grpc;
+
+option java_package = "org.alloytools.alloy.grpc.proto";
+option java_outer_classname = "AlloySolverProto";
+option java_multiple_files = true;
+//option go_package = "github.com/abitanon/org.alloytools.alloy.git";
+option py_generic_services = true;
+
+// Service definition for Alloy model solving
+service SolverService {
+  // Solve an Alloy model and return the solution
+  rpc Solve(SolveRequest) returns (SolveResponse);
+  
+  // Health check endpoint
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+// Request message for solving an Alloy model
+message SolveRequest {
+  // The Alloy model source code to solve
+  string model_content = 1;
+  
+  // Output format for the solution (default: JSON)
+  OutputFormat output_format = 2;
+  
+  // SAT solver to use (default: SAT4J)
+  SolverType solver_type = 3;
+  
+  // Optional solver configuration
+  SolverOptions solver_options = 4;
+  
+  // Optional command to execute (if not specified, runs default command)
+  string command = 5;
+}
+
+// Response message containing the solution
+message SolveResponse {
+  // Whether the model is satisfiable
+  bool satisfiable = 1;
+  
+  // Formatted solution data based on output_format
+  string solution_data = 2;
+  
+  // Error message if solving failed (empty if successful)
+  string error_message = 3;
+  
+  // Metadata about the solving process
+  SolutionMetadata metadata = 4;
+}
+
+// Metadata about the solving process
+message SolutionMetadata {
+  // Time taken to solve in milliseconds
+  int64 solving_time_ms = 1;
+  
+  // Solver that was actually used
+  string solver_used = 2;
+  
+  // Bitwidth used for integers
+  int32 bitwidth = 3;
+  
+  // Maximum sequence length
+  int32 max_seq = 4;
+  
+  // Number of unrolls performed
+  int32 unrolls = 5;
+  
+  // Skolem depth used
+  int32 skolem_depth = 6;
+  
+  // Whether symmetry breaking was enabled
+  bool symmetry_breaking = 7;
+  
+  // Number of variables in the SAT problem
+  int32 sat_variables = 8;
+  
+  // Number of clauses in the SAT problem
+  int32 sat_clauses = 9;
+  
+  // Whether this was an incremental solve
+  bool incremental = 10;
+  
+  // Command that was executed
+  string executed_command = 11;
+}
+
+// Solver configuration options
+message SolverOptions {
+  // Maximum number of unrolls (default: -1 for unlimited)
+  int32 unrolls = 1;
+  
+  // Skolem function depth (default: 0)
+  int32 skolem_depth = 2;
+  
+  // Integer bitwidth (default: 4)
+  int32 bitwidth = 3;
+  
+  // Maximum sequence length (default: 4)
+  int32 max_seq = 4;
+  
+  // Enable symmetry breaking (default: true)
+  bool symmetry_breaking = 5;
+  
+  // Disable integer overflow checking (default: false)
+  bool no_overflow = 6;
+  
+  // Core minimization strategy (0-2, default: 2)
+  int32 core_minimization = 7;
+  
+  // Core granularity (default: 0)
+  int32 core_granularity = 8;
+  
+  // Decompose mode (0=Off, 1=Hybrid, 2=Parallel, default: 0)
+  int32 decompose_mode = 9;
+  
+  // Number of threads for decomposition (default: 4)
+  int32 decompose_threads = 10;
+  
+  // Infer partial instance (default: false)
+  bool infer_partial_instance = 11;
+}
+
+// Supported output formats
+enum OutputFormat {
+  OUTPUT_FORMAT_UNSPECIFIED = 0;
+  OUTPUT_FORMAT_JSON = 1;    // JSON format (default, mirrors CLI -t json)
+  OUTPUT_FORMAT_XML = 2;     // XML format
+  OUTPUT_FORMAT_TEXT = 3;    // Plain text format
+  OUTPUT_FORMAT_TABLE = 4;   // Table format
+}
+
+// Supported SAT solvers
+enum SolverType {
+  SOLVER_TYPE_UNSPECIFIED = 0;
+  SOLVER_TYPE_SAT4J = 1;        // SAT4J (default, always available)
+  SOLVER_TYPE_MINISAT = 2;      // MiniSat (requires native libraries)
+  SOLVER_TYPE_GLUCOSE = 3;      // Glucose (requires native libraries)
+  SOLVER_TYPE_LINGELING = 4;    // Lingeling (requires native libraries)
+  SOLVER_TYPE_PLINGELING = 5;   // PLingeling (requires native libraries)
+  SOLVER_TYPE_CRYPTOMINISAT = 6; // CryptoMiniSat (requires native libraries)
+}
+
+// Health check request
+message PingRequest {
+  // Optional message to echo back
+  string message = 1;
+}
+
+// Health check response
+message PingResponse {
+  // Always returns "pong" or echoes the request message
+  string message = 1;
+  
+  // Server timestamp
+  int64 timestamp = 2;
+  
+  // Server version information
+  string version = 3;
+  
+  // Available solvers on this server
+  repeated string available_solvers = 4;
+}
