@@ -38,9 +38,9 @@ project(':org.alloytools.alloy.grpc') {
         implementation 'org.sat4j:org.sat4j.maxsat:2.3.1'
         implementation 'org.sat4j:org.sat4j.pb:2.3.1'
 
-        // Logging
-        implementation 'org.slf4j:slf4j-api:2.0.9'
-        runtimeOnly 'org.slf4j:slf4j-simple:2.0.9'
+        // Logging - using SLF4J 1.x for compatibility with Alloy dependencies
+        implementation 'org.slf4j:slf4j-api:1.7.36'
+        implementation 'org.slf4j:slf4j-simple:1.7.36'
 
         // JSON processing
         implementation 'com.google.code.gson:gson:2.10.1'
