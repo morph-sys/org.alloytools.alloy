@@ -3,8 +3,6 @@
 # Alloy gRPC Server Test Script
 # Tests all major endpoints to verify the server is working correctly
 
-set -e
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -100,7 +98,7 @@ echo -e "${BLUE}6. ❌ Error Handling Test:${NC}"
   "output_format": "OUTPUT_FORMAT_JSON",
   "solver_type": "SOLVER_TYPE_SAT4J"
 }' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
-if [ $? -eq 0 ]; then
+if [ ! $? -eq 0 ]; then
     echo -e "${GREEN}✅ Error handling test passed${NC}"
 else
     echo -e "${RED}❌ Error handling test failed${NC}"
