@@ -51,6 +51,7 @@ public class OutputFormatIntegrationTest {
             .setModelContent(SIMPLE_MODEL)
             .setOutputFormat(OutputFormat.OUTPUT_FORMAT_JSON)
             .setSolverType(SolverType.SOLVER_TYPE_SAT4J)
+            .setCommand("0")
             .build();
 
         // Execute request
@@ -88,6 +89,7 @@ public class OutputFormatIntegrationTest {
             .setModelContent(SIMPLE_MODEL)
             .setOutputFormat(OutputFormat.OUTPUT_FORMAT_XML)
             .setSolverType(SolverType.SOLVER_TYPE_SAT4J)
+            .setCommand("0")
             .build();
 
         // Execute request

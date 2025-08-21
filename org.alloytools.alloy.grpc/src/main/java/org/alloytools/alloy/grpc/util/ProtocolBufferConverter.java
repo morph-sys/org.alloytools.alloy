@@ -283,4 +283,23 @@ public class ProtocolBufferConverter {
                 return SolverType.SOLVER_TYPE_UNSPECIFIED;
         }
     }
+
+    /**
+     * Create SolveResponse for combined results from multiple commands.
+     */
+    public static SolveResponse createCombinedResponse(boolean anySatisfiable, String combinedResults, 
+                                                       long totalSolvingTimeMs, String solverUsed, 
+                                                       String executedCommand) {
+        SolutionMetadata metadata = SolutionMetadata.newBuilder()
+            .setSolvingTimeMs(totalSolvingTimeMs)
+            .setSolverUsed(solverUsed != null ? solverUsed : "unknown")
+            .setExecutedCommand(executedCommand)
+            .build();
+            
+        return SolveResponse.newBuilder()
+            .setSatisfiable(anySatisfiable)
+            .setSolutionData(combinedResults)
+            .setMetadata(metadata)
+            .build();
+    }
 }
