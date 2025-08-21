@@ -97,6 +97,7 @@ public class BasicSolvingIntegrationTest {
             .setModelContent(UNSATISFIABLE_MODEL)
             .setOutputFormat(OutputFormat.OUTPUT_FORMAT_TEXT)
             .setSolverType(SolverType.SOLVER_TYPE_SAT4J)
+            .setCommand("0")
             .build();
 
         service.solve(request, responseObserver);

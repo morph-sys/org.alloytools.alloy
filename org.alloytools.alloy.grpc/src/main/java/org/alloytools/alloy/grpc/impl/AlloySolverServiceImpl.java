@@ -68,42 +68,110 @@ public class AlloySolverServiceImpl extends SolverServiceGrpc.SolverServiceImplB
             CompModule world = loadResult.getModule();
             List<Command> commands = loadResult.getCommands();
 
-            // Find the command to execute
-            Optional<Command> commandOpt = ModelLoader.findCommand(commands, request.getCommand());
-            if (!commandOpt.isPresent()) {
-                responseObserver.onError(Status.INVALID_ARGUMENT
-                    .withDescription("Command not found: " + request.getCommand())
-                    .asRuntimeException());
-                return;
-            }
-
-            Command command = commandOpt.get();
-
             // Configure solver options
             A4Options options = ProtocolBufferConverter.toA4Options(
                 request.getSolverOptions(), 
                 request.getSolverType()
             );
 
-            // Execute the command
-            A4Solution solution = TranslateAlloyToKodkod.execute_command(
-                reporter, 
-                world.getAllReachableSigs(), 
-                command, 
-                options
-            );
+            // Check if specific command requested or execute all commands (default)
+            if (!request.getCommand().trim().isEmpty() && 
+                !"*".equals(request.getCommand().trim()) && 
+                !"ALL".equalsIgnoreCase(request.getCommand().trim())) {
+                // Execute specific command
+                Optional<Command> commandOpt = ModelLoader.findCommand(commands, request.getCommand());
+                if (!commandOpt.isPresent()) {
+                    responseObserver.onError(Status.INVALID_ARGUMENT
+                        .withDescription("Command not found: " + request.getCommand())
+                        .asRuntimeException());
+                    return;
+                }
 
-            long solvingTime = System.currentTimeMillis() - startTime;
+                Command command = commandOpt.get();
 
-            // Convert solution to response
-            SolveResponse response = ProtocolBufferConverter.toSolveResponse(
-                solution, 
-                request.getOutputFormat(), 
-                solvingTime, 
-                command.toString()
-            );
+                // Execute the specific command
+                A4Solution solution = TranslateAlloyToKodkod.execute_command(
+                    reporter, 
+                    world.getAllReachableSigs(), 
+                    command, 
+                    options
+                );
 
-            responseObserver.onNext(response);
+                long solvingTime = System.currentTimeMillis() - startTime;
+
+                // Convert solution to response
+                SolveResponse response = ProtocolBufferConverter.toSolveResponse(
+                    solution, 
+                    request.getOutputFormat(), 
+                    solvingTime, 
+                    command.toString()
+                );
+
+                responseObserver.onNext(response);
+            } else {
+                // Execute all commands (default behavior)
+                // Execute all commands and combine results
+                StringBuilder combinedResults = new StringBuilder();
+                boolean anySatisfiable = false;
+                long totalSolvingTime = 0;
+                String lastSolverUsed = "";
+                
+                for (int i = 0; i < commands.size(); i++) {
+                    Command command = commands.get(i);
+                    long commandStartTime = System.currentTimeMillis();
+                    
+                    A4Solution solution = TranslateAlloyToKodkod.execute_command(
+                        reporter, 
+                        world.getAllReachableSigs(), 
+                        command, 
+                        options
+                    );
+
+                    long commandSolvingTime = System.currentTimeMillis() - commandStartTime;
+                    totalSolvingTime += commandSolvingTime;
+
+                    // Convert individual solution to string
+                    SolveResponse individualResponse = ProtocolBufferConverter.toSolveResponse(
+                        solution, 
+                        request.getOutputFormat(), 
+                        commandSolvingTime, 
+                        command.toString()
+                    );
+
+                    if (individualResponse.getSatisfiable()) {
+                        anySatisfiable = true;
+                    }
+                    
+                    lastSolverUsed = individualResponse.getMetadata().getSolverUsed();
+
+                    // Combine results with command separator
+                    if (i > 0) {
+                        combinedResults.append("\n--- Command ").append(i + 1).append(" ---\n");
+                    } else {
+                        combinedResults.append("--- Command ").append(i + 1).append(" ---\n");
+                    }
+                    combinedResults.append("Command: ").append(command.toString()).append("\n");
+                    combinedResults.append("Satisfiable: ").append(individualResponse.getSatisfiable()).append("\n");
+                    if (!individualResponse.getSolutionData().isEmpty()) {
+                        combinedResults.append(individualResponse.getSolutionData()).append("\n");
+                    }
+                    if (!individualResponse.getErrorMessage().isEmpty()) {
+                        combinedResults.append("Error: ").append(individualResponse.getErrorMessage()).append("\n");
+                    }
+                }
+
+                // Create combined response
+                SolveResponse combinedResponse = ProtocolBufferConverter.createCombinedResponse(
+                    anySatisfiable,
+                    combinedResults.toString(),
+                    totalSolvingTime,
+                    lastSolverUsed,
+                    "All " + commands.size() + " commands"
+                );
+
+                responseObserver.onNext(combinedResponse);
+            }
+
             responseObserver.onCompleted();
 
         } catch (Err err) {
