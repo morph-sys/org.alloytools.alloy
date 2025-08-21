@@ -108,7 +108,7 @@ public class AlloySolverServiceImpl extends SolverServiceGrpc.SolverServiceImplB
 
         } catch (Err err) {
             responseObserver.onError(Status.fromCode(Status.Code.INTERNAL)
-                .withDescription("Alloy error: " + err.getMessage())
+                .withDescription("Alloy error: " + err.toString())
                 .asRuntimeException());
             
         } catch (Exception ex) {

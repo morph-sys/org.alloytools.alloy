@@ -81,7 +81,7 @@ public class ModelLoader {
             return ModelLoadResult.success(world, commands);
             
         } catch (Err err) {
-            return ModelLoadResult.error("Parse error: " + err.getMessage());
+            return ModelLoadResult.error("Parse error: " + err.toString());
         } catch (Exception ex) {
             return ModelLoadResult.error("Unexpected error: " + ex.getMessage());
         }
