@@ -1,0 +1,38 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-f'
+      - 'org.alloytools.alloy.grpc/Dockerfile'
+      - '-t'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/morph-dev/morph-alloy-grpc:latest'
+      - '.'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'push'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/morph-dev/morph-alloy-grpc:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'morph-alloy-grpc'
+      - '--image'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/morph-dev/morph-alloy-grpc:latest'
+      - '--region'
+      - 'us-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--max-instances'
+      - '1'
+      - '--port'
+      - '50051'
+
+images:
+  - 'us-west1-docker.pkg.dev/$PROJECT_ID/morph-dev/morph-alloy-grpc:latest'

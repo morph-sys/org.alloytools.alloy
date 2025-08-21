@@ -118,6 +118,11 @@ docker build -f org.alloytools.alloy.grpc/Dockerfile -t alloy-grpc:latest .
 docker run -p 50051:50051 alloy-grpc:latest
 ```
 
+### GCloud deployment
+```bash
+gcloud builds submit --config=org.alloytools.alloy.grpc/cloudbuild.yaml .
+```
+
 ### Environment Variables
 
 | Variable | Default | Description |
