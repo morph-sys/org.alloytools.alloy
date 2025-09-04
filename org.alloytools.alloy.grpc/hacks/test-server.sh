@@ -106,6 +106,74 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}7. 📁 Multi-File Model Test (Basic):${NC}"
+"${GRPCURL_CMD}" -plaintext -d '{
+  "files": [
+    {
+      "filename": "util.als", 
+      "content": "module util\nsig Util {}\npred hasUtil { some Util }"
+    },
+    {
+      "filename": "main.als", 
+      "content": "module main\nopen util\nrun { hasUtil } for 3"
+    }
+  ],
+  "main_file": "main.als",
+  "output_format": "OUTPUT_FORMAT_JSON",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Multi-file basic test passed${NC}"
+else
+    echo -e "${RED}❌ Multi-file basic test failed${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${BLUE}8. 📁 Multi-File Model Test (Parameterized):${NC}"
+"${GRPCURL_CMD}" -plaintext -d '{
+  "files": [
+    {
+      "filename": "library.als", 
+      "content": "module library[T]\nsig Container { items: set T }\npred hasItems[c: Container] { some c.items }"
+    },
+    {
+      "filename": "application.als", 
+      "content": "module application\nopen library[Int] as lib\nrun { some c: lib/Container | lib/hasItems[c] } for 3"
+    }
+  ],
+  "main_file": "application.als",
+  "output_format": "OUTPUT_FORMAT_TEXT",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Multi-file parameterized test passed${NC}"
+else
+    echo -e "${RED}❌ Multi-file parameterized test failed${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${BLUE}9. ❌ Multi-File Error Test (Missing Main File):${NC}"
+RESPONSE=$("${GRPCURL_CMD}" -plaintext -d '{
+  "files": [
+    {
+      "filename": "util.als", 
+      "content": "sig Util {}"
+    }
+  ],
+  "main_file": "missing.als",
+  "output_format": "OUTPUT_FORMAT_JSON",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve 2>&1)
+if echo "$RESPONSE" | grep -q "error_message"; then
+    echo -e "${GREEN}✅ Multi-file error handling test passed${NC}"
+else
+    echo -e "${RED}❌ Multi-file error handling test failed${NC}"
+    exit 1
+fi
+
+echo ""
 echo -e "${GREEN}🎉 All tests completed successfully!${NC}"
 echo -e "${YELLOW}📊 Test Summary:${NC}"
 echo "  ✅ Health Check"
@@ -114,5 +182,8 @@ echo "  ✅ Service Discovery"
 echo "  ✅ Simple Model Solving"
 echo "  ✅ Complex Model Solving"
 echo "  ✅ Error Handling"
+echo "  ✅ Multi-File Basic Model"
+echo "  ✅ Multi-File Parameterized Model"
+echo "  ✅ Multi-File Error Handling"
 echo ""
 echo -e "${BLUE}🚀 Your Alloy gRPC Server is working perfectly!${NC}"

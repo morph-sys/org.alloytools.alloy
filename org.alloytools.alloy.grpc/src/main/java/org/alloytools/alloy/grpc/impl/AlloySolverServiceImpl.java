@@ -1,9 +1,12 @@
 package org.alloytools.alloy.grpc.impl;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.alloytools.alloy.grpc.proto.AlloyFile;
 import org.alloytools.alloy.grpc.proto.PingRequest;
 import org.alloytools.alloy.grpc.proto.PingResponse;
 import org.alloytools.alloy.grpc.proto.SolveRequest;
@@ -54,9 +57,24 @@ public class AlloySolverServiceImpl extends SolverServiceGrpc.SolverServiceImplB
                 return;
             }
 
-            // Load and parse the model
+            // Load and parse the model (single-file or multi-file mode)
             ModelLoader.CollectingReporter reporter = new ModelLoader.CollectingReporter();
-            ModelLoader.ModelLoadResult loadResult = ModelLoader.loadModel(request.getModelContent(), reporter);
+            ModelLoader.ModelLoadResult loadResult;
+            
+            // Determine whether to use single-file or multi-file mode
+            if (!request.getFilesList().isEmpty()) {
+                // Multi-file mode
+                // Convert AlloyFile list to Map<String, String>
+                Map<String, String> fileMap = new HashMap<>();
+                for (AlloyFile alloyFile : request.getFilesList()) {
+                    fileMap.put(alloyFile.getFilename(), alloyFile.getContent());
+                }
+                
+                loadResult = ModelLoader.loadModelFromFiles(fileMap, request.getMainFile(), reporter);
+            } else {
+                // Single-file mode (backward compatibility)
+                loadResult = ModelLoader.loadModel(request.getModelContent(), reporter);
+            }
             
             if (!loadResult.isSuccess()) {
                 responseObserver.onError(Status.fromCode(Status.Code.INVALID_ARGUMENT)
@@ -151,8 +169,43 @@ public class AlloySolverServiceImpl extends SolverServiceGrpc.SolverServiceImplB
      * Validate the solve request.
      */
     private ValidationResult validateRequest(SolveRequest request) {
-        if (request.getModelContent() == null || request.getModelContent().trim().isEmpty()) {
+        // Check if both single-file and multi-file are provided
+        boolean hasModelContent = !request.getModelContent().trim().isEmpty();
+        boolean hasFiles = !request.getFilesList().isEmpty();
+        
+        if (hasModelContent && hasFiles) {
+            return ValidationResult.error("Cannot specify both model_content and files. Use one or the other.");
+        }
+        
+        // For single-file mode, check for empty content (preserves backward compatibility)
+        if (!hasFiles && request.getModelContent().trim().isEmpty()) {
             return ValidationResult.error("Model content cannot be null or empty");
+        }
+        
+        if (!hasModelContent && !hasFiles) {
+            return ValidationResult.error("Either model_content or files must be provided");
+        }
+        
+        // Validate multi-file specific requirements
+        if (hasFiles) {
+            if (request.getMainFile().trim().isEmpty()) {
+                return ValidationResult.error("main_file must be specified when using multi-file mode");
+            }
+            
+            // Check that all files have valid filenames
+            for (AlloyFile file : request.getFilesList()) {
+                if (file.getFilename().trim().isEmpty()) {
+                    return ValidationResult.error("All files must have non-empty filenames");
+                }
+            }
+            
+            // Check that main_file exists in the files list
+            boolean mainFileExists = request.getFilesList().stream()
+                .anyMatch(file -> file.getFilename().equals(request.getMainFile()));
+            
+            if (!mainFileExists) {
+                return ValidationResult.error("main_file '" + request.getMainFile() + "' not found in provided files");
+            }
         }
 
         // Let the Alloy parser handle syntax validation - it gives better error messages

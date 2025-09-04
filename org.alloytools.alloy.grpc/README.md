@@ -48,15 +48,46 @@ The service provides two main endpoints:
 
 ```protobuf
 message SolveRequest {
+  // Single-file mode (backward compatible)
   string model_content = 1;        // Alloy model source code
+  
+  // Multi-file mode (NEW)
+  repeated AlloyFile files = 6;    // Multiple Alloy files
+  string main_file = 7;            // Entry point file
+  
+  // Common parameters
   OutputFormat output_format = 2;  // JSON, XML, TEXT, TABLE
   SolverType solver_type = 3;      // SAT4J, MINISAT, GLUCOSE, etc.
   SolverOptions solver_options = 4; // Optional solver configuration
   string command = 5;              // Optional command to execute
 }
+
+message AlloyFile {
+  string filename = 1;             // File path (e.g., "util.als", "models/core.als")
+  string content = 2;              // Complete file content
+}
 ```
 
-### Client Examples
+#### Multi-File Mode Features
+
+- **Cross-file imports**: Use `open` directive to import other modules
+- **Parameterized modules**: Support for generic modules with type parameters  
+- **Directory structure**: Preserve relative paths in filenames
+- **Module aliases**: Support for `open module as alias` syntax
+- **Backward compatibility**: Single-file mode continues to work unchanged
+
+### Single-File Examples
+
+#### Using grpcurl
+
+```bash
+# Simple model solving
+grpcurl -plaintext -d '{
+  "model_content": "sig Person {} run {} for 3",
+  "output_format": "OUTPUT_FORMAT_JSON",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
+```
 
 #### Python
 
@@ -77,6 +108,72 @@ request = SolveRequest(
 response = stub.Solve(request)
 print(f"Satisfiable: {response.satisfiable}")
 print(f"Solution: {response.solution_data}")
+```
+
+### Multi-File Examples
+
+#### Basic Import
+
+```bash
+grpcurl -plaintext -d '{
+  "files": [
+    {
+      "filename": "util.als",
+      "content": "module util\nsig Util {}\npred hasUtil { some Util }"
+    },
+    {
+      "filename": "main.als", 
+      "content": "module main\nopen util\nrun { hasUtil } for 3"
+    }
+  ],
+  "main_file": "main.als",
+  "output_format": "OUTPUT_FORMAT_JSON",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
+```
+
+#### Parameterized Modules
+
+```bash
+grpcurl -plaintext -d '{
+  "files": [
+    {
+      "filename": "library.als",
+      "content": "module library[T]\nsig Container { items: set T }\npred hasItems[c: Container] { some c.items }"
+    },
+    {
+      "filename": "application.als",
+      "content": "module application\nopen library[String] as lib\nsig String {}\nrun { some c: lib/Container | lib/hasItems[c] } for 3"
+    }
+  ],
+  "main_file": "application.als",
+  "output_format": "OUTPUT_FORMAT_TEXT",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
+```
+
+#### Nested Directory Structure
+
+```bash
+grpcurl -plaintext -d '{
+  "files": [
+    {
+      "filename": "util/base.als",
+      "content": "module util/base\nsig Base {}"
+    },
+    {
+      "filename": "util/derived.als", 
+      "content": "module util/derived\nopen util/base\nsig Derived extends Base {}"
+    },
+    {
+      "filename": "main.als",
+      "content": "module main\nopen util/derived\nrun { some Derived } for 3"
+    }
+  ],
+  "main_file": "main.als",
+  "output_format": "OUTPUT_FORMAT_JSON",
+  "solver_type": "SOLVER_TYPE_SAT4J"
+}' localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
 ```
 
 ## Testing
@@ -102,8 +199,11 @@ grpcurl -plaintext -d "$(jq -n \
   '{"model_content": $mc, "output_format": "OUTPUT_FORMAT_JSON", "solver_type": "SOLVER_TYPE_SAT4J"}')" \
   localhost:50051 org.alloytools.alloy.grpc.SolverService/Solve
 
-# Start the server and then run the test script
+# Start the server and run comprehensive tests
 ./org.alloytools.alloy.grpc/hacks/test-server.sh
+
+# Run multi-file specific tests
+./org.alloytools.alloy.grpc/hacks/test-multifile-examples.sh
 ```
 
 ## Deployment
@@ -184,6 +284,67 @@ The Alloy gRPC service module is organized into the following directory structur
 
 - **`hacks/`** - Utility scripts
   - `start-server.sh` - Script to start the server
-  - `test-server.sh` - Script to test server functionality
+  - `test-server.sh` - Script to test server functionality including multi-file tests
+  - `test-multifile-examples.sh` - Comprehensive multi-file scenario tests
 
 - **`Dockerfile`** - Docker configuration for containerized deployment
+
+## Troubleshooting
+
+### Server Issues
+- **Port already in use**: Change the port with `--args="8080"` or check if another instance is running
+- **Build failures**: Run `./gradlew clean :org.alloytools.alloy.grpc:build` to rebuild from scratch
+- **Java version**: Ensure Java 11+ is installed and `JAVA_HOME` is set correctly
+
+### Multi-File Import Issues
+- **Module not found**: Ensure the filename in `files` array exactly matches the `open` directive
+- **Case sensitivity**: Filenames are case-sensitive, verify exact spelling
+- **Main file not found**: The `main_file` must exactly match one of the filenames in the `files` array
+- **Circular imports**: Check for circular dependencies between modules
+- **Module name mismatch**: Module declaration should match the expected path structure
+
+### Example Debugging
+
+#### Wrong filename case
+```bash
+# ❌ This will fail
+{
+  "files": [{"filename": "Util.als", "content": "module util\n..."}],
+  "main_file": "Util.als"
+}
+
+# ✅ This works
+{
+  "files": [{"filename": "util.als", "content": "module util\n..."}],
+  "main_file": "util.als"
+}
+```
+
+#### Missing main file
+```bash
+# ❌ This will fail - main_file not in files array
+{
+  "files": [{"filename": "util.als", "content": "..."}],
+  "main_file": "main.als"
+}
+
+# ✅ This works
+{
+  "files": [
+    {"filename": "util.als", "content": "..."},
+    {"filename": "main.als", "content": "..."}
+  ],
+  "main_file": "main.als"
+}
+```
+
+### Performance Considerations
+- **Large models**: Consider increasing JVM heap size with `JAVA_OPTS=-Xmx4g`
+- **Many files**: File processing is optimized but very large file sets may need tuning
+- **Temporary files**: The server creates temporary files for multi-file models - ensure adequate disk space
+
+### Common Error Messages
+- `"main_file must be specified when using multi-file mode"`: Set the `main_file` field
+- `"main_file 'X' not found in provided files"`: Add the main file to the `files` array
+- `"Cannot specify both model_content and files"`: Use either single-file or multi-file mode, not both
+- `"All files must have non-empty filenames"`: Check that every file in the `files` array has a filename
