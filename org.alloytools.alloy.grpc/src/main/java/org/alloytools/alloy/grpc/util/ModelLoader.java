@@ -1,10 +1,17 @@
 package org.alloytools.alloy.grpc.util;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.ast.Command;
 import edu.mit.csail.sdg.parser.CompModule;
 import edu.mit.csail.sdg.parser.CompUtil;
@@ -84,6 +91,106 @@ public class ModelLoader {
             return ModelLoadResult.error("Parse error: " + err.toString());
         } catch (Exception ex) {
             return ModelLoadResult.error("Unexpected error: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Load and parse an Alloy model from multiple files with cross-file references.
+     * This method supports the 'open' directive by creating temporary files that
+     * can be resolved by Alloy's module system.
+     * 
+     * @param fileMap Map of filename to file content
+     * @param mainFile The main file to parse (must exist in fileMap)
+     * @param reporter The reporter for diagnostics (can be null)
+     * @return ModelLoadResult containing the parsed module or error information
+     */
+    public static ModelLoadResult loadModelFromFiles(Map<String, String> fileMap, String mainFile, A4Reporter reporter) {
+        if (fileMap == null || fileMap.isEmpty()) {
+            return ModelLoadResult.error("File map cannot be null or empty");
+        }
+
+        if (mainFile == null || mainFile.trim().isEmpty()) {
+            return ModelLoadResult.error("Main file cannot be null or empty");
+        }
+
+        if (!fileMap.containsKey(mainFile)) {
+            return ModelLoadResult.error("Main file '" + mainFile + "' not found in provided files");
+        }
+
+        if (reporter == null) {
+            reporter = A4Reporter.NOP;
+        }
+
+        Path tempDir = null;
+        try {
+            // Create temporary directory structure
+            tempDir = Files.createTempDirectory("alloy-grpc-");
+            
+            // Write all files to temporary directory, preserving relative paths
+            Map<String, String> fileCache = new HashMap<>();
+            for (Map.Entry<String, String> entry : fileMap.entrySet()) {
+                String filename = entry.getKey();
+                String content = entry.getValue();
+                
+                // Create parent directories if needed
+                Path filePath = tempDir.resolve(filename);
+                Files.createDirectories(filePath.getParent());
+                
+                // Write file content
+                Files.write(filePath, content.getBytes("UTF-8"));
+                
+                // Add to file cache for CompUtil
+                fileCache.put(filename, content);
+            }
+            
+            // Get the absolute path of the main file
+            Path mainFilePath = tempDir.resolve(mainFile);
+            String mainFileAbsolutePath = mainFilePath.toAbsolutePath().toString();
+            
+            // Parse using CompUtil with file cache
+            CompModule world = CompUtil.parseEverything_fromFile(reporter, fileCache, mainFileAbsolutePath);
+            
+            // Get all commands from the module
+            List<Command> commands = world.getAllCommands();
+            
+            return ModelLoadResult.success(world, commands);
+            
+        } catch (Err err) {
+            return ModelLoadResult.error("Parse error: " + err.getMessage());
+        } catch (IOException ex) {
+            return ModelLoadResult.error("IO error while creating temporary files: " + ex.getMessage());
+        } catch (Exception ex) {
+            return ModelLoadResult.error("Unexpected error: " + ex.getMessage());
+        } finally {
+            // Clean up temporary directory
+            if (tempDir != null) {
+                try {
+                    deleteDirectory(tempDir.toFile());
+                } catch (Exception e) {
+                    // Log warning but don't fail the operation
+                    System.err.println("Warning: Failed to delete temporary directory: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Recursively delete a directory and all its contents.
+     * 
+     * @param directory The directory to delete
+     * @throws IOException if deletion fails
+     */
+    private static void deleteDirectory(File directory) throws IOException {
+        if (directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    deleteDirectory(file);
+                }
+            }
+        }
+        if (!directory.delete()) {
+            throw new IOException("Failed to delete " + directory.getAbsolutePath());
         }
     }
 

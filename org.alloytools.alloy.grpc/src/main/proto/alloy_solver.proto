@@ -19,7 +19,8 @@ service SolverService {
 
 // Request message for solving an Alloy model
 message SolveRequest {
-  // The Alloy model source code to solve
+  // The Alloy model source code to solve (single file mode)
+  // Use this for backward compatibility or simple single-file models
   string model_content = 1;
   
   // Output format for the solution (default: JSON)
@@ -33,6 +34,26 @@ message SolveRequest {
   
   // Optional command to execute (if not specified, runs default command)
   string command = 5;
+  
+  // Multiple Alloy files (multi-file mode)
+  // Use this when your model uses 'open' directives to import other modules
+  repeated AlloyFile files = 6;
+  
+  // The main file to execute when using multi-file mode
+  // Must match the filename of one of the files in the 'files' array
+  // Example: "main.als" or "models/core.als"
+  string main_file = 7;
+}
+
+// Represents a single Alloy file for multi-file model solving
+message AlloyFile {
+  // The filename/path relative to the model root
+  // Examples: "util.als", "models/core.als", "library/sequences.als"
+  // This should match the path used in 'open' directives
+  string filename = 1;
+  
+  // The complete content of the Alloy file
+  string content = 2;
 }
 
 // Response message containing the solution
