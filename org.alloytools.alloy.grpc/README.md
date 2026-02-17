@@ -245,6 +245,21 @@ Cloud Run. See [cloudbuild.yaml](cloudbuild.yaml) for the full pipeline.
 | `JAVA_OPTS` | `-Xmx2g -Xms512m` | JVM options |
 | `GRPC_PORT` | `50051` | gRPC server port |
 
+### JVM Tuning
+
+For production workloads, adjust JVM settings based on your requirements:
+
+```bash
+# For high-throughput scenarios
+JAVA_OPTS="-Xmx8g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# For low-latency scenarios
+JAVA_OPTS="-Xmx4g -Xms4g -XX:+UseZGC"
+
+# For memory-constrained environments
+JAVA_OPTS="-Xmx1g -Xms512m -XX:+UseSerialGC"
+```
+
 ## Project Structure
 
 The Alloy gRPC service module is organized into the following directory structure:
