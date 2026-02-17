@@ -12,9 +12,10 @@ A gRPC service for Alloy 6 that exposes model solving capabilities through a wel
 ## Installation
 
 ### Prerequisites
-- Java 11+
-- Gradle 7.0+
+- Java 17+
+- Gradle 7.2+ (via included wrapper)
 - grpcurl (optional, for testing)
+- Docker (optional, for containerized deployment)
 
 ### Building
 ```bash
@@ -210,18 +211,32 @@ grpcurl -plaintext -d "$(jq -n \
 
 ### Docker
 
+The Dockerfile uses a multi-stage build. The builder stage compiles only the gRPC
+module (it uses pre-built JARs from `lib/`, not sibling module sources). The
+runtime stage uses an Eclipse Temurin JRE image.
+
 ```bash
-# Build image
+# Build image (run from the repo root)
 docker build -f org.alloytools.alloy.grpc/Dockerfile -t alloy-grpc:latest .
 
 # Run container
 docker run -p 50051:50051 alloy-grpc:latest
+
+# Run with custom port and JVM settings
+docker run -p 8080:8080 \
+  -e GRPC_PORT=8080 \
+  -e JAVA_OPTS="-Xmx4g -Xms1g" \
+  alloy-grpc:latest
 ```
 
-### GCloud deployment
+### Google Cloud Build + Cloud Run
+
 ```bash
 gcloud builds submit --config=org.alloytools.alloy.grpc/cloudbuild.yaml .
 ```
+
+This builds the Docker image, pushes it to Artifact Registry, and deploys to
+Cloud Run. See [cloudbuild.yaml](cloudbuild.yaml) for the full pipeline.
 
 ### Environment Variables
 
@@ -229,21 +244,6 @@ gcloud builds submit --config=org.alloytools.alloy.grpc/cloudbuild.yaml .
 |----------|---------|-------------|
 | `JAVA_OPTS` | `-Xmx2g -Xms512m` | JVM options |
 | `GRPC_PORT` | `50051` | gRPC server port |
-
-### JVM Tuning
-
-For production workloads, adjust JVM settings based on your requirements:
-
-```bash
-# For high-throughput scenarios
-JAVA_OPTS="-Xmx8g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-
-# For low-latency scenarios
-JAVA_OPTS="-Xmx4g -Xms4g -XX:+UseZGC"
-
-# For memory-constrained environments
-JAVA_OPTS="-Xmx1g -Xms512m -XX:+UseSerialGC"
-```
 
 ## Project Structure
 

@@ -1,12 +1,5 @@
 # Multi-stage build for Alloy gRPC Service
-FROM openjdk:17-jdk-slim as builder
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    wget \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:17-jdk-jammy AS builder
 
 # Set working directory
 WORKDIR /app
@@ -16,25 +9,24 @@ COPY gradlew gradlew.bat ./
 COPY .gradle-wrapper/ .gradle-wrapper/
 COPY build.gradle settings.gradle gradle.properties ./
 
-# Copy source code
+# Copy bnd workspace config (required by the bnd workspace Gradle plugin)
 COPY cnf/ cnf/
-COPY org.alloytools.alloy.core/ org.alloytools.alloy.core/
-COPY org.alloytools.alloy.dist/ org.alloytools.alloy.dist/
+
+# Copy only the gRPC module — it uses pre-built JARs from its own lib/ directory,
+# so sibling module sources (alloy.core, api, pardinus, etc.) are not needed.
+# Copying them would cause the bnd workspace plugin to discover their bnd.bnd files
+# and fail during configuration due to missing transitive dependencies.
 COPY org.alloytools.alloy.grpc/ org.alloytools.alloy.grpc/
-COPY org.alloytools.api/ org.alloytools.api/
-COPY org.alloytools.pardinus.core/ org.alloytools.pardinus.core/
 
 # Build the application and create distribution
 RUN chmod +x gradlew && ./gradlew :org.alloytools.alloy.grpc:build :org.alloytools.alloy.grpc:distTar -x test
 
-# Production stage
-FROM openjdk:17-jdk-slim
+# Production stage — JRE is sufficient for running the server
+FROM eclipse-temurin:17-jre-jammy
 
-# Install runtime dependencies and health check tools
-RUN apt-get update && apt-get install -y \
-    curl \
+# Install health check tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
